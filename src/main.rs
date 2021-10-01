@@ -2,12 +2,13 @@ use std::env;
 use todo::{Todo, help};
 
 fn main() {
-    let todo = Todo::new().expect("Couldn't create the todo instance");
+    let todo = Todo::new().expect("couldn't create the todo instance");
 
-    let args: Vec<String> = env::args().collect();
+    let args: Vec<String> = env::args().skip(1).collect();
 
     if args.len() > 1 {
-        let command = &args[1];
+        let command = &args[0];
+
         match &command[..] {
             "list" => todo.list(),
             "add" => todo.add(&args[2..]),

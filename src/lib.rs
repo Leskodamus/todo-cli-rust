@@ -6,7 +6,8 @@ use std::io::{BufReader, BufWriter, Write};
 use std::{process, env, path};
 
 pub struct Todo {
-    pub todo: Vec<String>
+    pub todo: Vec<String>,
+    todo_path: path::PathBuf,
 }
 
 impl Todo {
@@ -20,13 +21,13 @@ impl Todo {
         }
 
         let todo = path::Path::new(".todo");
-        let home_path = home.to_str().unwrap();
+        let todo_path = path::Path::new(home.to_str().unwrap()).join(todo);
 
         let todofile = OpenOptions::new()
             .write(true)
             .read(true)
             .create(true)
-            .open(path::Path::new(&home_path).join(todo))
+            .open(&todo_path)
             .expect("couldn't open the todofile");
 
         let mut buf_reader = BufReader::new(&todofile);
@@ -37,7 +38,7 @@ impl Todo {
         let todo = contents.lines().map(str::to_string).collect();
 
         // Returns todo
-        Ok(Self { todo })
+        Ok(Self { todo, todo_path })
     }
 
     // Prints every todo saved
