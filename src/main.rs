@@ -6,16 +6,14 @@ fn main() {
 
     let args: Vec<String> = env::args().skip(1).collect();
 
-    if args.len() > 1 {
+    if args.len() >= 1 {
         let command = &args[0];
 
         match &command[..] {
             "list" => todo.list(),
-            "add" => todo.add(&args[2..]),
-            "rm" => todo.remove(&args[2..]),
-            "done" => todo.done(&args[2..]),
-            "raw" => todo.raw(&args[2..]),
-            "sort" => todo.sort(),
+            "add" => todo.add(&args[1..]),
+            "rm" => todo.remove(&args[1..]),
+            "done" => todo.done(&args[1..]),
             "help" | "--help" | "-h" | _ => help(),
         }
     } else {
