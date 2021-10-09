@@ -13,13 +13,15 @@ pub struct Todo {
 
 impl Todo {
     pub fn new() -> Result<Self, String> {
-        let mut home: OsString;
-
-        if cfg!(windows) {
-            home = env::var_os("USERPROFILE").unwrap();
-        } else {
-            home = env::var_os("XDG_DATA_HOME").unwrap_or(env::var_os("HOME").unwrap());
-        }
+        let home: OsString = match env::consts::OS {
+            "linux" | "macos" => {
+                env::var_os("XDG_DATA_HOME").unwrap_or(env::var_os("HOME").unwrap())
+            },
+            "windows" => {
+                env::var_os("USERPROFILE").unwrap()
+            },
+            _ => panic!("unsupported operating system"),
+        };
 
         let todo_path = path::Path::new(&home).join(".todo");
         let todo_file = OpenOptions::new()
