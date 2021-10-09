@@ -3,8 +3,6 @@ A lightweight and super fast cli todo program written in rust
 
 Fork of <https://github.com/sioodmy/todo>
 
-use `cargo build --release` to compile todo and copy `target/release/todo` to `/usr/bin`
-
 ## usage
 ```Usage: todo [COMMAND] [ARGUMENTS]
 todo is a super fast and simple tasks organizer written in rust
