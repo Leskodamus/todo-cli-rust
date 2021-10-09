@@ -76,8 +76,8 @@ impl Todo {
                     let task = &task[4..];
 
                     match symbol {
-                        "[ ] " if arg[0] == "done" => println!("{}", task),     /* DONE */
-                        "[*] " if arg[0] == "undone" => println!("{}", task),   /* NOT DONE */
+                        "[ ] " if arg[0] == "undone" => println!("{}", task),     /* DONE */
+                        "[*] " if arg[0] == "done" => println!("{}", task),   /* NOT DONE */
                         "[ ] " | "[*] " => (),  /* do nothing; only show for appropriate arg */
                         _ => eprintln!("{} possibility of broken todo file", "warning:".red()),     /* SMTH WRONG */
                     }
@@ -226,12 +226,12 @@ impl Todo {
 }
 
 const TODO_HELP: &str = "Usage: todo [COMMAND] [ARGUMENTS]
-Todo is a super fast and simple tasks organizer written in rust
-Example: todo list
+todo is a super fast and simple tasks organizer written in rust
+
 Available commands:
     - add [TASK/s] 
         adds new task/s
-        Example: todo add \"buy carrots\"
+        Example: todo add \"read a book\"
     - list
         lists all tasks
         Example: todo list
@@ -247,8 +247,8 @@ Available commands:
     - sort
         sorts completed and uncompleted tasks
         Example: todo sort 
-    - raw [todo/done]
-        prints nothing but done/incompleted tasks in plain text, useful for scripting
+    - raw [todo|done]
+        prints nothing but done/undone tasks in plain text, useful for scripting
         Example: todo raw done
 ";
 
