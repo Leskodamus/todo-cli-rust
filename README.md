@@ -10,7 +10,7 @@ todo is a super fast and simple tasks organizer written in rust
 Available commands:
     - add [TASK/s] 
         adds new task/s
-        Example: todo add \"read a book\"
+        Example: todo add "read a book"
     - list
         lists all tasks
         Example: todo list
