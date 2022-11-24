@@ -1,6 +1,6 @@
 use colored::*;
 use std::ffi::OsString;
-use std::fs::OpenOptions;
+use std::fs::{OpenOptions, self};
 use std::io::{BufReader, BufWriter, Write, BufRead};
 use std::path::PathBuf;
 use std::{process, env, path::Path};
@@ -14,7 +14,7 @@ pub struct Todo {
 
 impl Todo {
     pub fn new() -> Result<Self, String> {
-        let home: OsString = match env::consts::OS {
+        let home = match env::consts::OS {
             "linux" | "macos" => {
                 env::var_os("XDG_DATA_HOME").unwrap_or(
                     match env::var_os("HOME") {
@@ -38,14 +38,14 @@ impl Todo {
                 .read(true)
                 .create(true)
                 .open(&file_path) 
-            {
-                Ok(f) => f,
-                Err(e) => return Err(format!("failed to open todo file: {}", e)),
-            };
+        {
+            Ok(f) => f,
+            Err(e) => return Err(format!("failed to open todo file: {}", e)),
+        };
 
         let tasks: Tasks = BufReader::new(todo_file)
             .lines()
-            .map(|line| line.unwrap())
+            .map(|task| task.expect("failed to read todo file"))
             .collect();
 
         Ok(Self { tasks, file_path })
