@@ -1,6 +1,6 @@
 use colored::*;
 use std::ffi::OsString;
-use std::fs::{OpenOptions, self};
+use std::fs::{OpenOptions, self, File};
 use std::io::{BufReader, BufWriter, Write, BufRead};
 use std::path::PathBuf;
 use std::{process, env, path::Path};
@@ -9,6 +9,7 @@ type Tasks = Vec<String>;
 
 pub struct Todo {
     pub tasks: Tasks,
+    pub n_tasks: usize,
     pub file_path: PathBuf,
 }
 
@@ -48,7 +49,9 @@ impl Todo {
             .map(|task| task.expect("failed to read todo file"))
             .collect();
 
-        Ok(Self { tasks, file_path })
+        let n_tasks = tasks.len();
+
+        Ok(Self { tasks, n_tasks, file_path })
     }
 
     pub fn list(&self) -> () {
@@ -101,64 +104,75 @@ impl Todo {
         }
     }
 
-    pub fn add(&self, args: &[String]) {
+    fn write_to_file(&self, append: bool) -> Result<(), String> {
+        let mut begin = 0;
+        let mut file_opts = OpenOptions::new(); 
+
+        if append {
+            if self.tasks.len() <= self.n_tasks {
+                return Err("cannot append to file because there is nothing to append".into());
+            }
+            begin = self.n_tasks;
+            file_opts.create(true).append(true);
+        } else {
+            file_opts.create(true).write(true).truncate(true);
+        }
+
+        let mut todo_file = match file_opts.open(&self.file_path) {
+            Ok(f) => f,
+            Err(e) => return Err(format!("failed to open todo file: {}", e)),
+        };
+
+        for task in &self.tasks[begin..] {
+            match todo_file.write_fmt(format_args!("{task}\n")) {
+                Ok(_) => (),
+                Err(e) => return Err(format!("failed to write todo file: {}", e)),
+            };
+        }
+
+        Ok(())
+    }
+
+    pub fn add(&mut self, args: &[String]) {
         if args.len() < 1 {
             eprintln!("todo add needs at least 1 argument");
             process::exit(1);
         } else {
-            let mut todo_file = match 
-                OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .open(&self.file_path)
-            {
-                Ok(f) => f,
-                Err(e) => {
-                    eprintln!("failed to open todo file: {}", e);
-                    process::exit(1);
-                },
-            };
-
             for arg in args {
-                match todo_file.write_fmt(format_args!("[ ] {}\n", arg)) {
-                    Ok(_) => (),
-                    Err(e) => {
-                        eprintln!("failed to write todo file: {}", e);
-                        process::exit(1);
-                    },
-                };
+                self.tasks.push(format!("[ ] {}", arg))
+            }
+            match self.write_to_file(true) {
+                Ok(_) => (),
+                Err(e) => {
+                    eprintln!("{e}");
+                    process::exit(1);
+                }
             }
         }
     }
 
-    pub fn remove(&self, args: &[String]) {
+    pub fn remove(&mut self, args: &[String]) {
         if args.len() < 1 {
             eprintln!("todo rm needs at least 1 argument");
             process::exit(1);
         } else {
-            let todo_file = match 
-                OpenOptions::new()
-                    .write(true)
-                    .truncate(true)
-                    .open(&self.file_path)
-            {
-                Ok(f) => f,
+            let mut decr_next = false;
+            for arg in args {
+                let mut idx = arg.parse::<usize>().unwrap() - 1;
+                if decr_next && idx >= 1 { idx -= 1; }
+                if idx < self.tasks.len() {
+                    let _ = self.tasks.remove(idx);
+                    decr_next = true;
+                } else {
+                    decr_next = false;
+                }
+            }
+            match self.write_to_file(false) {
+                Ok(_) => (),
                 Err(e) => {
-                    eprintln!("failed to open todo file: {}", e);
+                    eprintln!("{e}");
                     process::exit(1);
-                },
-            };
-
-            let mut buf = BufWriter::new(todo_file);
-            for (idx, task) in self.tasks.iter().enumerate() {
-                if args.contains(&(idx + 1).to_string()) { continue }
-                match buf.write_fmt(format_args!("{}\n", task)) {
-                    Ok(_) => (),
-                    Err(e) => {
-                        eprintln!("failed to write todo file: {}", e);
-                        process::exit(1);
-                    },
-                };
+                }
             }
         }
     }
