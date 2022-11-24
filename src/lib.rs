@@ -1,19 +1,19 @@
 use colored::*;
-use std::ffi::OsString;
-use std::fs::{OpenOptions, self, File};
-use std::io::{BufReader, BufWriter, Write, BufRead};
+use std::fs::OpenOptions;
+use std::io::{BufReader, Write, BufRead};
 use std::path::PathBuf;
 use std::{process, env, path::Path};
 
 type Tasks = Vec<String>;
 
 pub struct Todo {
-    pub tasks: Tasks,
-    pub n_tasks: usize,
-    pub file_path: PathBuf,
+    pub tasks: Tasks,       /* vector containing all tasks */
+    pub n_tasks: usize,     /* initial number of tasks */
+    pub file_path: PathBuf, /* path of todo file  */
 }
 
 impl Todo {
+    /* Create a new todo instance whiche creates the todo file */
     pub fn new() -> Result<Self, String> {
         let home = match env::consts::OS {
             "linux" | "macos" => {
@@ -54,6 +54,7 @@ impl Todo {
         Ok(Self { tasks, n_tasks, file_path })
     }
 
+    /* List all tasks */
     pub fn list(&self) -> () {
         for (idx, task) in self.tasks.iter().enumerate() {
             let idx = (idx + 1).to_string().bold();
@@ -77,13 +78,14 @@ impl Todo {
         }
     }
 
+    /* List either done or undone tasks without any formatting */
     pub fn raw(&self, arg: &[String]) {
         if arg.len() > 1 {
             eprintln!("todo raw takes only 1 argument, not {}", arg.len())
         } else if arg.len() < 1 {
             eprintln!("todo raw needs 1 argument [done|undone]");
         } else {
-            for task in self.tasks.iter() {
+            for task in &self.tasks {
                 if task.len() > 4 {
                     let symbol = &task[..4];
                     let task = &task[4..];
@@ -104,6 +106,8 @@ impl Todo {
         }
     }
 
+    /* Write content of tasks vector to todo file 
+     * If append is true, append the file if the vector size has increased */
     fn write_to_file(&self, append: bool) -> Result<(), String> {
         let mut begin = 0;
         let mut file_opts = OpenOptions::new(); 
@@ -133,13 +137,14 @@ impl Todo {
         Ok(())
     }
 
+    /* Add new task to todo and save to file */
     pub fn add(&mut self, args: &[String]) {
         if args.len() < 1 {
             eprintln!("todo add needs at least 1 argument");
             process::exit(1);
         } else {
-            for arg in args {
-                self.tasks.push(format!("[ ] {}", arg))
+            for task in args {
+                self.tasks.push(format!("[ ] {}", task))
             }
             match self.write_to_file(true) {
                 Ok(_) => (),
@@ -151,15 +156,20 @@ impl Todo {
         }
     }
 
+    /* Remove a task from todo */
     pub fn remove(&mut self, args: &[String]) {
         if args.len() < 1 {
             eprintln!("todo rm needs at least 1 argument");
             process::exit(1);
         } else {
+            /* If (not the last) element gets removed, all remaining indices 
+             * have to get reduced by one for each removal */
             let mut decr_next = 0;
             for arg in args {
                 let idx = arg.parse::<usize>().unwrap() - 1 - decr_next;
                 if idx < self.tasks.len() {
+                    /* Decrease following indices only if the 
+                     * removed index was not the last item */
                     if idx < self.tasks.len() - 1 {
                         decr_next += 1;
                     }
@@ -176,6 +186,7 @@ impl Todo {
         }
     }
 
+    /* Mark a task as done */
     pub fn done(&mut self, args: &[String]) {
         if args.len() < 1 {
             eprintln!("todo done needs at least 1 argument");
@@ -205,6 +216,7 @@ impl Todo {
         }
     }
 
+    /* Mark a done task as undone */
     pub fn undone(&mut self, args: &[String]) {
         if args.len() < 1 {
             eprintln!("todo undone needs at least 1 argument");
@@ -234,6 +246,8 @@ impl Todo {
         }
     }
 
+    /* Sort tasks by their status: 
+     * done tasks get placed at the bottom */
     pub fn sort(&mut self) {
         for idx in 0..self.tasks.len() {
             if self.tasks[idx].len() > 4 {
@@ -268,24 +282,22 @@ const TODO_HELP: &str = "Usage: todo [COMMAND] [ARGUMENTS]
 todo is a super fast and simple tasks organizer written in rust
 
 Available commands:
-    - add [TASK/s] 
-        adds new task/s
-        Example: todo add \"read a book\"
+    - add [TASK]
+        adds new task(s)
+        Example: todo add \"read a book\" \"do homework\"
     - list
         lists all tasks
-        Example: todo list
     - done [INDEX]
-        marks task with INDEX as done
-        Example: todo done 2 3 (marks second and third tasks as completed)
+        marks task(s) with INDEX as done
+        Example: todo done 2 3 (marks second and third task as completed)
     - undone [INDEX]
-        reverts done task with INDEX to undone
+        reverts done task(s) with INDEX to undone
         Example: todo undone 3 (no longer marks the third task as completed)
     - rm [INDEX] 
-        removes a task
-        Example: todo rm 4 
+        removes task(s) with INDEX 
+        Example: todo rm 4 1 (removes first and fourth task)
     - sort
         sorts completed and uncompleted tasks
-        Example: todo sort 
     - raw [done|undone]
         prints nothing but done/undone tasks in plain text, useful for scripting
         Example: todo raw done
