@@ -156,15 +156,14 @@ impl Todo {
             eprintln!("todo rm needs at least 1 argument");
             process::exit(1);
         } else {
-            let mut decr_next = false;
+            let mut decr_next = 0;
             for arg in args {
-                let mut idx = arg.parse::<usize>().unwrap() - 1;
-                if decr_next && idx >= 1 { idx -= 1; }
+                let idx = arg.parse::<usize>().unwrap() - 1 - decr_next;
                 if idx < self.tasks.len() {
+                    if idx < self.tasks.len() - 1 {
+                        decr_next += 1;
+                    }
                     let _ = self.tasks.remove(idx);
-                    decr_next = true;
-                } else {
-                    decr_next = false;
                 }
             }
             match self.write_to_file(false) {
@@ -177,97 +176,73 @@ impl Todo {
         }
     }
 
-    pub fn done(&self, args: &[String]) {
+    pub fn done(&mut self, args: &[String]) {
         if args.len() < 1 {
             eprintln!("todo done needs at least 1 argument");
             process::exit(1);
         } else {
-            let todo_file = match 
-                OpenOptions::new()
-                    .write(true)
-                    .open(&self.file_path)
-            {
-                Ok(f) => f,
-                Err(e) => {
-                    eprintln!("failed to open todo file: {}", e);
-                    process::exit(1);
-                },
-            };
-
-            let mut buf = BufWriter::new(todo_file);
-            for (idx, task) in self.tasks.iter().enumerate() {
-                if task.len() > 4 {
-                    let fmt_task;
-                    if args.contains(&(idx + 1).to_string()) {
-                        fmt_task = format!("[*] {}\n", &task[4..]);
+            for arg in args {
+                let idx = arg.parse::<usize>().unwrap() - 1;
+                if idx < self.tasks.len() {
+                    let task = &self.tasks[idx];
+                    if task.len() > 4 {
+                        self.tasks[idx] = format!("[*] {}", &task[4..]);
                     } else {
-                        fmt_task = format!("{}\n", task);
+                        eprintln!("{} corrupt todo file: task with wrong format", "warning:".red());
+                        process::exit(1);
                     }
-                    match buf.write_all(fmt_task.as_bytes()) {
-                        Ok(_) => (),
-                        Err(e) => {
-                            eprintln!("failed to write todo file: {}", e);
-                            process::exit(1);
-                        },
-                    };
-                } else {
-                    eprintln!("{} corrupt todo file: task with wrong format", "warning:".red());
+                }
+                continue;
+            }
+
+            match self.write_to_file(false) {
+                Ok(_) => (),
+                Err(e) => {
+                    eprintln!("{e}");
                     process::exit(1);
                 }
             }
         }
     }
 
-    pub fn undone(&self, args: &[String]) {
+    pub fn undone(&mut self, args: &[String]) {
         if args.len() < 1 {
             eprintln!("todo undone needs at least 1 argument");
             process::exit(1);
         } else {
-            let todo_file = match 
-                OpenOptions::new()
-                    .write(true)
-                    .open(&self.file_path)
-            {
-                Ok(f) => f,
-                Err(e) => {
-                    eprintln!("failed to open todo file: {}", e);
-                    process::exit(1);
-                },
-            };
-
-            let mut buf = BufWriter::new(todo_file);
-            for (idx, task) in self.tasks.iter().enumerate() {
-                if task.len() > 4 {
-                    let fmt_task;
-                    if &task[..4] == "[*] " && args.contains(&(idx + 1).to_string()) {
-                        fmt_task = format!("[ ] {}\n", &task[4..]);
+            for arg in args {
+                let idx = arg.parse::<usize>().unwrap() - 1;
+                if idx < self.tasks.len() {
+                    let task = &self.tasks[idx];
+                    if task.len() > 4 {
+                        self.tasks[idx] = format!("[ ] {}", &task[4..]);
                     } else {
-                        fmt_task = format!("{}\n", task);
+                        eprintln!("{} corrupt todo file: task with wrong format", "warning:".red());
+                        process::exit(1);
                     }
+                }
+                continue;
+            }
 
-                    match buf.write_all(fmt_task.as_bytes()) {
-                        Ok(_) => (),
-                        Err(e) => {
-                            eprintln!("failed to write todo file: {}", e);
-                            process::exit(1);
-                        },
-                    };
-                } else {
-                    eprintln!("{} corrupt todo file: task with wrong format", "warning:".red());
+            match self.write_to_file(false) {
+                Ok(_) => (),
+                Err(e) => {
+                    eprintln!("{e}");
                     process::exit(1);
                 }
             }
         }
     }
 
-    pub fn sort(&self) {
-        let mut sorted_tasks = Tasks::new();
-
-        for task in self.tasks.iter() {
-            if task.len() > 4 {
-                match &task[..4] {
-                    "[ ] " => sorted_tasks.insert(0, format!("{}\n", task)),    /* Add undone task to beginning of vec */
-                    "[*] " => sorted_tasks.push(format!("{}\n", task)),         /* Add done task to end of vec */
+    pub fn sort(&mut self) {
+        for idx in 0..self.tasks.len() {
+            if self.tasks[idx].len() > 4 {
+                match &self.tasks[idx][..4] {
+                    "[ ] " => {
+                        let task = self.tasks.remove(idx);
+                        self.tasks.insert(0, task);
+                    },
+                    "[*] " => (),
                     _ => {
                         eprintln!("{} corrupt todo file: task with wrong symbol", "warning:".red());
                         process::exit(1);
@@ -279,27 +254,12 @@ impl Todo {
             }
         }
 
-        let mut todo_file = match 
-            OpenOptions::new()
-                .write(true)
-                .truncate(true)
-                .open(&self.file_path)
-        {
-            Ok(f) => f,
+        match self.write_to_file(false) {
+            Ok(_) => (),
             Err(e) => {
-                eprintln!("failed to open todo file: {}", e);
+                eprintln!("{e}");
                 process::exit(1);
-            },
-        };
-
-        for task in sorted_tasks {
-            match todo_file.write_all(task.as_bytes()) {
-                Ok(_) => (),
-                Err(e) => {
-                    eprintln!("failed to write todo file: {}", e);
-                    process::exit(1);
-                },
-            };
+            }
         }
     }
 }
