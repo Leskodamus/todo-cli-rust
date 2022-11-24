@@ -1,66 +1,73 @@
 use colored::*;
 use std::ffi::OsString;
 use std::fs::OpenOptions;
-use std::io::prelude::Read;
-use std::io::{BufReader, BufWriter, Write};
+use std::io::{BufReader, BufWriter, Write, BufRead};
 use std::path::PathBuf;
-use std::{process, env, path};
+use std::{process, env, path::Path};
+
+type Tasks = Vec<String>;
 
 pub struct Todo {
-    pub todo: Vec<String>,
-    pub todo_path: PathBuf,
+    pub tasks: Tasks,
+    pub file_path: PathBuf,
 }
 
 impl Todo {
     pub fn new() -> Result<Self, String> {
         let home: OsString = match env::consts::OS {
             "linux" | "macos" => {
-                /* The $HOME variable is usually always set */
-                env::var_os("XDG_DATA_HOME").unwrap_or(env::var_os("HOME").unwrap())
+                env::var_os("XDG_DATA_HOME").unwrap_or(
+                    match env::var_os("HOME") {
+                        Some(dir) => dir,
+                        None => return Err("failed to read $XDG_DATA_HOME or $HOME".into()),
+                    })
             },
             "windows" => {
-                env::var_os("USERPROFILE").unwrap()
+                match env::var_os("USERPROFILE") {
+                    Some(dir) => dir,
+                    None => return Err("failed to read %USERPROFILE%".into()),
+                }
             },
-            _ => panic!("unsupported operating system"),
+            _ => return Err("unsupported operating system".into()),
         };
 
-        let todo_path = path::Path::new(&home).join(".todo");
-        let todo_file = OpenOptions::new()
-            .write(true)
-            .read(true)
-            .create(true)
-            .open(&todo_path)
-            .expect("couldn't open the todo file");
+        let file_path = Path::new(&home).join(".todo");
+        let todo_file = match 
+            OpenOptions::new()
+                .write(true)
+                .read(true)
+                .create(true)
+                .open(&file_path) 
+            {
+                Ok(f) => f,
+                Err(e) => return Err(format!("failed to open todo file: {}", e)),
+            };
 
-        let mut buf_reader = BufReader::new(&todo_file);
-        let mut contents = String::new();
-        buf_reader.read_to_string(&mut contents).expect("failed to read from todo file");
-        let todo = contents.lines().map(str::to_string).collect();
+        let tasks: Tasks = BufReader::new(todo_file)
+            .lines()
+            .map(|line| line.unwrap())
+            .collect();
 
-        Ok(Self { todo, todo_path })
+        Ok(Self { tasks, file_path })
     }
 
     pub fn list(&self) -> () {
-        for (number, task) in self.todo.iter().enumerate() {
-            let number = (number + 1).to_string().bold();
+        for (idx, task) in self.tasks.iter().enumerate() {
+            let idx = (idx + 1).to_string().bold();
 
-            // check length of current task
             if task.len() <= 4 { 
-                eprintln!("{} corrupt todo file: task with wrong format\nfix your todo file: {}", "warning:".red(), self.todo_path.display());
+                eprintln!("{} corrupt todo file: task with wrong format", "warning:".red());
                 process::exit(1);
             }
 
-            // saves the symbol of current task => '[ ] ' or '[x] '
             let symbol = &task[..4];
-
-            // saves a task without the symbol
             let task = &task[4..];
 
             match symbol {
-                "[*] " => println!("{} {}", number, task.strikethrough()),  /* DONE */
-                "[ ] " => println!("{} {}", number, task),  /* NOT DONE */
+                "[*] " => println!("{} {}", idx, task.strikethrough()), /* DONE */
+                "[ ] " => println!("{} {}", idx, task),                 /* NOT DONE */
                 _ => {
-                    eprintln!("{} possibility of broken todo file", "warning:".red());   /* SMTH WRONG */
+                    eprintln!("{} corrupt todo file: task with wrong symbol", "warning:".red());
                     process::exit(1);
                 }
             }
@@ -71,24 +78,23 @@ impl Todo {
         if arg.len() > 1 {
             eprintln!("todo raw takes only 1 argument, not {}", arg.len())
         } else if arg.len() < 1 {
-            eprintln!("todo raw needs 1 argument [done|todo]");
+            eprintln!("todo raw needs 1 argument [done|undone]");
         } else {
-            for task in self.todo.iter() {
+            for task in self.tasks.iter() {
                 if task.len() > 4 {
-                    // save the symbol of current task
                     let symbol = &task[..4];
-
-                    // save a task without the symbol
                     let task = &task[4..];
-
+    
                     match symbol {
-                        "[ ] " if arg[0] == "undone" => println!("{}", task),     /* DONE */
-                        "[*] " if arg[0] == "done" => println!("{}", task),   /* NOT DONE */
+                        "[ ] " if arg[0] == "undone" => println!("{}", task),   /* DONE */
+                        "[*] " if arg[0] == "done" => println!("{}", task),     /* NOT DONE */
                         "[ ] " | "[*] " => (),  /* do nothing; only show for appropriate arg */
-                        _ => eprintln!("{} possibility of broken todo file", "warning:".red()),     /* SMTH WRONG */
-                    }
+                        _ => {
+                            eprintln!("{} corrupt todo file: task with wrong symbol", "warning:".red());
+                            process::exit(1);
+                        }                    }
                 } else {
-                    eprintln!("{} corrupt todo file: task with wrong format\nfix your todo file: {}", "warning:".red(), self.todo_path.display());
+                    eprintln!("{} corrupt todo file: task with wrong format", "warning:".red());
                     process::exit(1);
                 }
             }
@@ -100,20 +106,27 @@ impl Todo {
             eprintln!("todo add needs at least 1 argument");
             process::exit(1);
         } else {
-            let todo_file = OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(&self.todo_path)
-                .expect("couldn't open the todo file");
+            let mut todo_file = match 
+                OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(&self.file_path)
+            {
+                Ok(f) => f,
+                Err(e) => {
+                    eprintln!("failed to open todo file: {}", e);
+                    process::exit(1);
+                },
+            };
 
-            let mut buffer = BufWriter::new(todo_file);
             for arg in args {
-                if arg.trim().len() < 1 {
-                    continue;
-                }
-
-                let line = format!("[ ] {}\n", arg);
-                buffer.write_all(line.as_bytes()).expect("unable to write data");
+                match todo_file.write_fmt(format_args!("[ ] {}\n", arg)) {
+                    Ok(_) => (),
+                    Err(e) => {
+                        eprintln!("failed to write todo file: {}", e);
+                        process::exit(1);
+                    },
+                };
             }
         }
     }
@@ -123,21 +136,29 @@ impl Todo {
             eprintln!("todo rm needs at least 1 argument");
             process::exit(1);
         } else {
-            let todo_file = OpenOptions::new()
-                .write(true)
-                .truncate(true)
-                .open(&self.todo_path)
-                .expect("couldn't open the todo file");
+            let todo_file = match 
+                OpenOptions::new()
+                    .write(true)
+                    .truncate(true)
+                    .open(&self.file_path)
+            {
+                Ok(f) => f,
+                Err(e) => {
+                    eprintln!("failed to open todo file: {}", e);
+                    process::exit(1);
+                },
+            };
 
-            let mut buffer = BufWriter::new(todo_file);
-
-            for (pos, line) in self.todo.iter().enumerate() {
-                if args.contains(&(pos + 1).to_string()) {
-                    continue;
-                }
-
-                let line = format!("{}\n", line);
-                buffer.write_all(line.as_bytes()).expect("unable to write data");
+            let mut buf = BufWriter::new(todo_file);
+            for (idx, task) in self.tasks.iter().enumerate() {
+                if args.contains(&(idx + 1).to_string()) { continue }
+                match buf.write_fmt(format_args!("{}\n", task)) {
+                    Ok(_) => (),
+                    Err(e) => {
+                        eprintln!("failed to write todo file: {}", e);
+                        process::exit(1);
+                    },
+                };
             }
         }
     }
@@ -147,24 +168,36 @@ impl Todo {
             eprintln!("todo done needs at least 1 argument");
             process::exit(1);
         } else {
-            let todo_file = OpenOptions::new()
-                .write(true)
-                .open(&self.todo_path)
-                .expect("couldn't open the todo file");
+            let todo_file = match 
+                OpenOptions::new()
+                    .write(true)
+                    .open(&self.file_path)
+            {
+                Ok(f) => f,
+                Err(e) => {
+                    eprintln!("failed to open todo file: {}", e);
+                    process::exit(1);
+                },
+            };
 
-            let mut buffer = BufWriter::new(todo_file);
-
-            for (pos, line) in self.todo.iter().enumerate() {
-                if line.len() > 4 {
-                    if args.contains(&(pos + 1).to_string()) {
-                        let line = format!("[*] {}\n", &line[4..]);
-                        buffer.write_all(line.as_bytes()).expect("unable to write data");
+            let mut buf = BufWriter::new(todo_file);
+            for (idx, task) in self.tasks.iter().enumerate() {
+                if task.len() > 4 {
+                    let fmt_task;
+                    if args.contains(&(idx + 1).to_string()) {
+                        fmt_task = format!("[*] {}\n", &task[4..]);
                     } else {
-                        let line = format!("{}\n", line);
-                        buffer.write_all(line.as_bytes()).expect("unable to write data");
+                        fmt_task = format!("{}\n", task);
                     }
+                    match buf.write_all(fmt_task.as_bytes()) {
+                        Ok(_) => (),
+                        Err(e) => {
+                            eprintln!("failed to write todo file: {}", e);
+                            process::exit(1);
+                        },
+                    };
                 } else {
-                    eprintln!("{} corrupt todo file: task with wrong format\nfix your todo file: {}", "warning:".red(), self.todo_path.display());
+                    eprintln!("{} corrupt todo file: task with wrong format", "warning:".red());
                     process::exit(1);
                 }
             }
@@ -176,26 +209,37 @@ impl Todo {
             eprintln!("todo undone needs at least 1 argument");
             process::exit(1);
         } else {
-            let todo_file = OpenOptions::new()
-                .write(true)
-                .open(&self.todo_path)
-                .expect("couldn't open the todo file");
+            let todo_file = match 
+                OpenOptions::new()
+                    .write(true)
+                    .open(&self.file_path)
+            {
+                Ok(f) => f,
+                Err(e) => {
+                    eprintln!("failed to open todo file: {}", e);
+                    process::exit(1);
+                },
+            };
 
-            let mut buffer = BufWriter::new(todo_file);
-
-            for (pos, line) in self.todo.iter().enumerate() {
-                if line.len() > 4 {
-                    if args.contains(&(pos + 1).to_string()) {
-                        if &line[..4] == "[*] " {
-                            let line = format!("[ ] {}\n", &line[4..]);
-                            buffer.write_all(line.as_bytes()).expect("unable to write data");
-                        }
+            let mut buf = BufWriter::new(todo_file);
+            for (idx, task) in self.tasks.iter().enumerate() {
+                if task.len() > 4 {
+                    let fmt_task;
+                    if &task[..4] == "[*] " && args.contains(&(idx + 1).to_string()) {
+                        fmt_task = format!("[ ] {}\n", &task[4..]);
                     } else {
-                        let line = format!("{}\n", line);
-                        buffer.write_all(line.as_bytes()).expect("unable to write data");
+                        fmt_task = format!("{}\n", task);
                     }
+
+                    match buf.write_all(fmt_task.as_bytes()) {
+                        Ok(_) => (),
+                        Err(e) => {
+                            eprintln!("failed to write todo file: {}", e);
+                            process::exit(1);
+                        },
+                    };
                 } else {
-                    eprintln!("{} corrupt todo file: task with wrong format\nfix your todo file: {}", "warning:".red(), self.todo_path.display());
+                    eprintln!("{} corrupt todo file: task with wrong format", "warning:".red());
                     process::exit(1);
                 }
             }
@@ -203,30 +247,45 @@ impl Todo {
     }
 
     pub fn sort(&self) {
-        let mut new_todo = Vec::<String>::new();
+        let mut sorted_tasks = Tasks::new();
 
-        for line in self.todo.iter() {
-            if line.len() > 4 {
-                match &line[..4] {
-                    "[ ] " => new_todo.insert(0, format!("{}\n", line)),    /* put done task to beginning of vec */
-                    "[*] " => new_todo.push(format!("{}\n", line)),     /* add undone task to vec */
-                    _ => eprintln!("{} possibility of broken todo file", "warning:".red()),     /* SMTH WRONG */
+        for task in self.tasks.iter() {
+            if task.len() > 4 {
+                match &task[..4] {
+                    "[ ] " => sorted_tasks.insert(0, format!("{}\n", task)),    /* Add undone task to beginning of vec */
+                    "[*] " => sorted_tasks.push(format!("{}\n", task)),         /* Add done task to end of vec */
+                    _ => {
+                        eprintln!("{} corrupt todo file: task with wrong symbol", "warning:".red());
+                        process::exit(1);
+                    }
                 }
             } else {
-                eprintln!("{} corrupt todo file: task with wrong format\nfix your todo file: {}", "warning:".red(), self.todo_path.display());
+                eprintln!("{} corrupt todo file: task with wrong format", "warning:".red());
                 process::exit(1);
             }
         }
 
-        let todo_file = OpenOptions::new()
-            .write(true)
-            .truncate(true)
-            .open(&self.todo_path)
-            .expect("couldn't open the todo file");
+        let mut todo_file = match 
+            OpenOptions::new()
+                .write(true)
+                .truncate(true)
+                .open(&self.file_path)
+        {
+            Ok(f) => f,
+            Err(e) => {
+                eprintln!("failed to open todo file: {}", e);
+                process::exit(1);
+            },
+        };
 
-        let mut buffer = BufWriter::new(todo_file);
-        for line in new_todo {
-            buffer.write_all(line.as_bytes()).expect("error while trying to write to todo file");
+        for task in sorted_tasks {
+            match todo_file.write_all(task.as_bytes()) {
+                Ok(_) => (),
+                Err(e) => {
+                    eprintln!("failed to write todo file: {}", e);
+                    process::exit(1);
+                },
+            };
         }
     }
 }
@@ -253,7 +312,7 @@ Available commands:
     - sort
         sorts completed and uncompleted tasks
         Example: todo sort 
-    - raw [todo|done]
+    - raw [done|undone]
         prints nothing but done/undone tasks in plain text, useful for scripting
         Example: todo raw done
 ";

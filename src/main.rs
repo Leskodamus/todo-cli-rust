@@ -15,8 +15,8 @@ fn main() {
             "rm" => todo.remove(&args[1..]),
             "done" => todo.done(&args[1..]),
             "undone" => todo.undone(&args[1..]),
-            "raw" => todo.raw(&args[1..]),
             "sort" => todo.sort(),
+            "raw" => todo.raw(&args[1..]),
             "help" | "--help" | "-h" | _ => help(),
         }
     } else {
