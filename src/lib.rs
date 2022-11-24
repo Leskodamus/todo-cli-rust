@@ -15,6 +15,7 @@ impl Todo {
     pub fn new() -> Result<Self, String> {
         let home: OsString = match env::consts::OS {
             "linux" | "macos" => {
+                /* The $HOME variable is usually always set */
                 env::var_os("XDG_DATA_HOME").unwrap_or(env::var_os("HOME").unwrap())
             },
             "windows" => {
@@ -33,7 +34,7 @@ impl Todo {
 
         let mut buf_reader = BufReader::new(&todo_file);
         let mut contents = String::new();
-        buf_reader.read_to_string(&mut contents).unwrap();
+        buf_reader.read_to_string(&mut contents).expect("failed to read from todo file");
         let todo = contents.lines().map(str::to_string).collect();
 
         Ok(Self { todo, todo_path })
@@ -58,7 +59,10 @@ impl Todo {
             match symbol {
                 "[*] " => println!("{} {}", number, task.strikethrough()),  /* DONE */
                 "[ ] " => println!("{} {}", number, task),  /* NOT DONE */
-                _ => eprintln!("{} possibility of broken todo file", "warning:".red()),   /* SMTH WRONG */
+                _ => {
+                    eprintln!("{} possibility of broken todo file", "warning:".red());   /* SMTH WRONG */
+                    process::exit(1);
+                }
             }
         }
     }
@@ -238,10 +242,10 @@ Available commands:
         lists all tasks
         Example: todo list
     - done [INDEX]
-        marks task as done
+        marks task with INDEX as done
         Example: todo done 2 3 (marks second and third tasks as completed)
     - undone [INDEX]
-        reverts done task to undone
+        reverts done task with INDEX to undone
         Example: todo undone 3 (no longer marks the third task as completed)
     - rm [INDEX] 
         removes a task
