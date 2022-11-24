@@ -1,7 +1,3 @@
-Instead of always working with the file directly, e.g. with a bufwriter or the file itself,
-work with the tasks vector and after modifying it, write it to file.
-This would need a helper function to write the vector to the file.
-
 Add function to open the todo file in a text editor, e.g. vim,
 or read tasks from todo file and pipe them to a text editor where
 the user can modify them and after saving write the changes to the todo file.
