@@ -1,9 +1,10 @@
-# todo
-A lightweight and super fast cli todo program written in rust
+# todo-cli
+A lightweight and super fast cli todo program written in Rust
 
 Fork of <https://github.com/sioodmy/todo>
 
 ## usage
+
 ```Usage: todo [COMMAND] [ARGUMENTS]
 todo is a super fast and simple tasks organizer written in rust
 
