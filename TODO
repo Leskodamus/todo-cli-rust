@@ -1,0 +1,3 @@
+Instead of always working with the file directly, e.g. with a bufwriter or the file itself,
+work with the tasks vector and after modifying it, write it to file.
+This would need a helper function to write the vector to the file.
