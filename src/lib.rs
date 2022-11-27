@@ -1,7 +1,7 @@
 use colored::*;
 use std::env::temp_dir;
 use std::fs::{OpenOptions, remove_file};
-use std::io::{BufReader, Write, BufRead, LineWriter, Read, Seek};
+use std::io::{BufReader, Write, BufRead, Seek};
 use std::path::PathBuf;
 use std::process::Command;
 use std::{process, env, path::Path};
@@ -283,7 +283,14 @@ impl Todo {
                     process::exit(1);
                 }
             }
-            // remove_file(file_path);
+            
+            match remove_file(file_path) {
+                Ok(()) => (),
+                Err(e) => {
+                    eprintln!("failed to delete temp file: {e}");
+                    process::exit(1);
+                },
+            };
         }
     }
 
