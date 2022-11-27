@@ -15,25 +15,27 @@ Fork of <https://github.com/sioodmy/todo>
 todo is a super fast and simple tasks organizer written in rust
 
 Available commands:
-    - add [TASK/s] 
-        adds new task/s
-        Example: todo add "read a book"
+    - add [TASK]
+        adds new task(s)
+        Example: todo add \"read a book\" \"do homework\"
+    - rm [INDEX] 
+        removes task(s) with INDEX 
+        Example: todo rm 4 1 (removes first and fourth task)
+    - edit [INDEX] (EXPERIMENTAL)
+        opens task(s) with INDEX in editor or all tasks if 
+        no INDEX supplied and saves the changes to file
+        Example: todo edit 1 2 (opens task 1 and 2 in editor)
     - list
         lists all tasks
-        Example: todo list
     - done [INDEX]
-        marks task as done
-        Example: todo done 2 3 (marks second and third tasks as completed)
+        marks task(s) with INDEX as done
+        Example: todo done 2 3 (marks second and third task as completed)
     - undone [INDEX]
-        reverts done task to undone
+        reverts done task(s) with INDEX to undone
         Example: todo undone 3 (no longer marks the third task as completed)
-    - rm [INDEX] 
-        removes a task
-        Example: todo rm 4 
     - sort
         sorts completed and uncompleted tasks
-        Example: todo sort 
-    - raw [todo|done]
+    - raw [done|undone]
         prints nothing but done/undone tasks in plain text, useful for scripting
         Example: todo raw done
 ```

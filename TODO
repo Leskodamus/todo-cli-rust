@@ -1,5 +1,0 @@
-Add function to open the todo file in a text editor, e.g. vim,
-or read tasks from todo file and pipe them to a text editor where
-the user can modify them and after saving write the changes to the todo file.
-This should be like editing a commit message in git.
-An interactive way to modify existing tasks.
