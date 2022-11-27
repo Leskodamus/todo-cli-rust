@@ -1,0 +1,4 @@
+* More colors
+* Better decision making for which editor to use 
+* Let user specify editor, e.g. '--editor=vim'
+* Use a config file or env var to decide where to store todo file

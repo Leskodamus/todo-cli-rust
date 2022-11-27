@@ -204,7 +204,7 @@ impl Todo {
 
     /* Opens a text editor to edit task */
     fn edit_task_in_editor(&mut self, idx: usize) {
-        let file_path = temp_dir().join("EDIT_TODO");
+        let file_path = temp_dir().join("EDIT_TODO_TASK");
         let mut tmp_file = match OpenOptions::new()
             .create(true)
             .write(true)
@@ -432,9 +432,8 @@ Available commands:
         removes task(s) with INDEX 
         Example: todo rm 4 1 (removes first and fourth task)
     - edit [INDEX] (EXPERIMENTAL)
-        opens task(s) with INDEX in editor or all tasks if 
-        no INDEX supplied and saves the changes to file
-        Example: todo edit 1 2 (opens task 1 and 2 in editor)
+        opens task(s) with INDEX in an editor 
+        Example: todo edit 1 2 (opens each task 1 and 2 in an editor)
     - list
         lists all tasks
     - done [INDEX]
