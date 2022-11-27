@@ -45,17 +45,22 @@ impl Todo {
             Err(e) => return Err(format!("failed to open todo file: {}", e)),
         };
 
-        let tasks: Tasks = BufReader::new(todo_file)
-            .lines()
-            .enumerate()
-            .map(|(idx, task)| task.expect(
-                format!("failed to read todo file while reading line {}", idx+1).as_str()
-            ))
-            .collect();
+        let mut tasks = Tasks::new();
+        for line in BufReader::new(todo_file).lines() {
+            match line {
+                Ok(t) => tasks.push(t),
+                Err(e) => return Err(format!("failed to read todo file: {}", e)),
+            }
+        }
 
         let n_tasks = tasks.len();
 
         Ok(Self { tasks, n_tasks, file_path })
+    }
+
+    /* Check if task (line) format is valid */
+    fn is_valid_task(task: &str) -> bool {
+        return task.len() > 4 && (&task[..4] == "[ ] " || &task[..4] == "[*] ") 
     }
 
     /* List all tasks */
@@ -63,9 +68,9 @@ impl Todo {
         for (idx, task) in self.tasks.iter().enumerate() {
             let idx = (idx + 1).to_string().bold();
 
-            if task.len() <= 4 { 
-                eprintln!("{} corrupt todo file: task with wrong format", "warning:".red());
-                process::exit(1);
+            if !Self::is_valid_task(task) {
+                eprintln!("corrupt todo file: invalid format at line {}", idx.normal());
+                process::exit(2);
             }
 
             let symbol = &task[..4];
@@ -75,8 +80,8 @@ impl Todo {
                 "[*] " => println!("{} {}", idx, task.strikethrough()), /* DONE */
                 "[ ] " => println!("{} {}", idx, task),                 /* NOT DONE */
                 _ => {
-                    eprintln!("{} corrupt todo file: task with wrong symbol", "warning:".red());
-                    process::exit(1);
+                    eprintln!("corrupt todo file: invalid format at line {}", idx.normal());
+                    process::exit(2);
                 }
             }
         }
@@ -84,13 +89,12 @@ impl Todo {
 
     /* List either done or undone tasks without any formatting */
     pub fn raw(&self, arg: &[String]) {
-        if arg.len() > 1 {
-            eprintln!("todo raw takes only 1 argument, not {}", arg.len())
-        } else if arg.len() < 1 {
+        if arg.len() != 1 {
             eprintln!("todo raw needs 1 argument [done|undone]");
+            help();
         } else {
-            for task in &self.tasks {
-                if task.len() > 4 {
+            for (idx, task) in self.tasks.iter().enumerate() {
+                if Self::is_valid_task(task) {
                     let symbol = &task[..4];
                     let task = &task[4..];
     
@@ -99,12 +103,12 @@ impl Todo {
                         "[*] " if arg[0] == "done" => println!("{}", task),     /* NOT DONE */
                         "[ ] " | "[*] " => (),  /* do nothing; only show for appropriate arg */
                         _ => {
-                            eprintln!("{} corrupt todo file: task with wrong symbol", "warning:".red());
-                            process::exit(1);
+                            eprintln!("corrupt todo file: invalid format at line {}", idx.to_string());
+                            process::exit(2);
                         }                    }
                 } else {
-                    eprintln!("{} corrupt todo file: task with wrong format", "warning:".red());
-                    process::exit(1);
+                    eprintln!("corrupt todo file: invalid format at line {}", idx.to_string());
+                    process::exit(2);
                 }
             }
         }
@@ -150,6 +154,7 @@ impl Todo {
             for task in args {
                 self.tasks.push(format!("[ ] {}", task))
             }
+
             match self.write_to_file(true) {
                 Ok(_) => (),
                 Err(e) => {
@@ -180,6 +185,7 @@ impl Todo {
                     let _ = self.tasks.remove(idx);
                 }
             }
+
             match self.write_to_file(false) {
                 Ok(_) => (),
                 Err(e) => {
@@ -197,14 +203,20 @@ impl Todo {
             process::exit(1);
         } else {
             for arg in args {
-                let idx = arg.parse::<usize>().unwrap() - 1;
+                let idx = match arg.parse::<usize>() {
+                    Ok(i) => i,
+                    Err(_) => {
+                        eprintln!("todo done requires a positive integer as argument");
+                        process::exit(1);
+                    },
+                };
                 if idx < self.tasks.len() {
                     let task = &self.tasks[idx];
-                    if task.len() > 4 {
+                    if Self::is_valid_task(task) {
                         self.tasks[idx] = format!("[*] {}", &task[4..]);
                     } else {
-                        eprintln!("{} corrupt todo file: task with wrong format", "warning:".red());
-                        process::exit(1);
+                        eprintln!("corrupt todo file: invalid format at line {}", idx.to_string());
+                        process::exit(2);
                     }
                 }
                 continue;
@@ -227,14 +239,20 @@ impl Todo {
             process::exit(1);
         } else {
             for arg in args {
-                let idx = arg.parse::<usize>().unwrap() - 1;
+                let idx = match arg.parse::<usize>() {
+                    Ok(i) => i,
+                    Err(_) => {
+                        eprintln!("todo done requires a positive integer as argument");
+                        process::exit(1);
+                    },
+                };
                 if idx < self.tasks.len() {
                     let task = &self.tasks[idx];
-                    if task.len() > 4 {
+                    if Self::is_valid_task(task) {
                         self.tasks[idx] = format!("[ ] {}", &task[4..]);
                     } else {
-                        eprintln!("{} corrupt todo file: task with wrong format", "warning:".red());
-                        process::exit(1);
+                        eprintln!("corrupt todo file: invalid format at line {}", idx.to_string());
+                        process::exit(2);
                     }
                 }
                 continue;
@@ -254,21 +272,22 @@ impl Todo {
      * done tasks get placed at the bottom */
     pub fn sort(&mut self) {
         for idx in 0..self.tasks.len() {
-            if self.tasks[idx].len() > 4 {
-                match &self.tasks[idx][..4] {
+            let task = &self.tasks[idx];
+            if Self::is_valid_task(task) {
+                match &task[..4] {
                     "[ ] " => {
                         let task = self.tasks.remove(idx);
                         self.tasks.insert(0, task);
                     },
                     "[*] " => (),
                     _ => {
-                        eprintln!("{} corrupt todo file: task with wrong symbol", "warning:".red());
-                        process::exit(1);
+                        eprintln!("corrupt todo file: invalid format at line {}", idx.to_string());
+                        process::exit(2);
                     }
                 }
             } else {
-                eprintln!("{} corrupt todo file: task with wrong format", "warning:".red());
-                process::exit(1);
+                eprintln!("corrupt todo file: invalid format at line {}", idx.to_string());
+                process::exit(2);
             }
         }
 

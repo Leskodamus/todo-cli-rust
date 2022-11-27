@@ -1,15 +1,20 @@
-use std::env;
+use std::{env, process};
 use todo::{Todo, help};
 
 fn main() {
-    let mut todo = Todo::new().expect("couldn't create todo instance");
+    let mut todo = match Todo::new() {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("Could not create todo instance: {}", e);
+            process::exit(1);
+        },
+    };
 
     let args: Vec<String> = env::args().skip(1).collect();
-
     if args.len() >= 1 {
-        let command = &args[0];
+        let cmd = &args[0];
 
-        match &command[..] {
+        match &cmd[..] {
             "list" => todo.list(),
             "add" => todo.add(&args[1..]),
             "rm" => todo.remove(&args[1..]),
