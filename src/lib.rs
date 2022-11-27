@@ -204,7 +204,7 @@ impl Todo {
         } else {
             for arg in args {
                 let idx = match arg.parse::<usize>() {
-                    Ok(i) => i,
+                    Ok(i) => i-1,
                     Err(_) => {
                         eprintln!("todo done requires a positive integer as argument");
                         process::exit(1);
@@ -240,7 +240,7 @@ impl Todo {
         } else {
             for arg in args {
                 let idx = match arg.parse::<usize>() {
-                    Ok(i) => i,
+                    Ok(i) => i-1,
                     Err(_) => {
                         eprintln!("todo done requires a positive integer as argument");
                         process::exit(1);
