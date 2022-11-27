@@ -257,23 +257,7 @@ impl Todo {
                     },
                 }
             }
-
-            /* Remove task if line is empty 
-             * TODO: if a task is removed then the following tasks
-             *       have a wrong index, same problem as with remove() */
-            if new_task.trim().is_empty() {
-                self.tasks.remove(idx);
-            } else {
-                self.tasks[idx] = format!("{}{}", &self.tasks[idx][..4], new_task);
-            }
-
-            match self.write_to_file(false) {
-                Ok(_) => (),
-                Err(e) => {
-                    eprintln!("{e}");
-                    process::exit(1);
-                }
-            }
+            self.tasks[idx] = format!("{}{}", &self.tasks[idx][..4], new_task);
             
             match remove_file(file_path) {
                 Ok(()) => (),
@@ -294,6 +278,7 @@ impl Todo {
             eprintln!("todo edit needs at least 1 argument");
             process::exit(1);
         } else {
+            let mut indices = Vec::<usize>::new();
             for arg in args {
                 let idx = match arg.parse::<usize>() {
                     Ok(i) => i-1,
@@ -302,9 +287,28 @@ impl Todo {
                         process::exit(1);
                     },
                 };
-
                 if idx < self.tasks.len() {
-                    self.edit_task_in_editor(idx);
+                    indices.push(idx);
+                }
+            }
+            indices.iter().for_each(|idx| self.edit_task_in_editor(*idx));
+
+            /* Sort indices descending to avoid conflicts
+             * with indexing when removing empty tasks */
+            indices.sort_by(|a, b| b.cmp(a));
+            
+            /* Delete removed tasks (empty lines) */
+            for idx in indices {
+                if self.tasks[idx][4..].trim().is_empty() {
+                    self.tasks.remove(idx);
+                }
+            }
+
+            match self.write_to_file(false) {
+                Ok(_) => (),
+                Err(e) => {
+                    eprintln!("{e}");
+                    process::exit(1);
                 }
             }
         }
