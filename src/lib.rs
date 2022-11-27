@@ -198,8 +198,8 @@ impl Todo {
         }
     }
 
-    /* Opens a text editor to edit tasks */
-    fn open_tasks_in_editor(&mut self, tasks_idx: &Vec<usize>) {
+    /* Opens a text editor to edit task */
+    fn edit_task_in_editor(&mut self, idx: usize) {
         let file_path = temp_dir().join("EDIT_TODO");
         let mut tmp_file = match OpenOptions::new()
             .create(true)
@@ -210,70 +210,61 @@ impl Todo {
         {
             Ok(f) => f,
             Err(_) => {
-                eprintln!("failed to open temp file for editing tasks");
+                eprintln!("failed to open temp file for editing task");
                 process::exit(1);
             },
         };
 
-        /* Place important note */
-        match tmp_file.write_all("# DO NOT DELETE TASKS IN HERE! USE THE 'rm' COMMAND INSTEAD.\n\n".as_bytes()) {
+        match tmp_file.write_fmt(format_args!("{}", &self.tasks[idx][4..])) {
             Ok(()) => (),
             Err(e) => {
-                eprintln!("failed to initialise temp file for editing tasks: {e}");
+                eprintln!("failed to initialise temp file for editing task: {e}");
                 process::exit(1);
             },
         };
 
-        for idx in tasks_idx {
-            let task = &self.tasks[*idx][4..];
-            match tmp_file.write_fmt(format_args!("{}\n", task)) {
-                Ok(()) => (),
-                Err(e) => {
-                    eprintln!("failed to initialise temp file for editing tasks: {e}");
-                    process::exit(1);
-                },
-            };
-        }
-
-        /* Open tmp_file in editor */
+        /* Open tmp_file in editor 
+         * TODO: better lookup which editor to use */
         let editor = env::var("EDITOR").unwrap_or("vi".into());
-
-        let status = match Command::new(editor)
+        let editor_status = match Command::new(editor)
             .arg(&file_path)
             .status() 
         {
             Ok(s) => s,
             Err(e) => {
-                eprintln!("failed to open editor to edit tasks: {e}");
+                eprintln!("failed to open editor to edit task: {e}");
                 process::exit(1);
             },
         };
 
-        if status.success() {
-            let mut new_tasks = Tasks::new();
-
+        if editor_status.success() {
+            /* Reset file pointer to beginning */
             match tmp_file.seek(std::io::SeekFrom::Start(0)) {
                 Ok(_) => (),
                 Err(e) => {
-                    eprintln!("failed to read edited tasks: {e}");
+                    eprintln!("failed to read edited task: {e}");
                     process::exit(1);
                 },
             };
 
-            for line in BufReader::new(tmp_file).lines().skip(2) {
+            let mut new_task = String::new();
+            for line in BufReader::new(tmp_file).lines().take(1) {
                 match line {
-                    Ok(t) => new_tasks.push(t),
+                    Ok(t) => new_task = t,
                     Err(e) => {
-                        eprintln!("failed to read edited tasks: {e}");
+                        eprintln!("failed to read edited task: {e}");
                         process::exit(1);
                     },
                 }
             }
 
-            for (i, idx) in tasks_idx.iter().enumerate() {
-                let symbol = &self.tasks[*idx][..4];
-                let task = format!("{}{}", symbol, new_tasks[i]);
-                self.tasks[*idx] = task;
+            /* Remove task if line is empty 
+             * TODO: if a task is removed then the following tasks
+             *       have a wrong index, same problem as with remove() */
+            if new_task.trim().is_empty() {
+                self.tasks.remove(idx);
+            } else {
+                self.tasks[idx] = format!("{}{}", &self.tasks[idx][..4], new_task);
             }
 
             match self.write_to_file(false) {
@@ -291,15 +282,17 @@ impl Todo {
                     process::exit(1);
                 },
             };
+        } else {
+            eprintln!("editor failed to process data");
+            process::exit(1);
         }
     }
 
-    /* Edit all tasks or specified ones with an editor */
+    /* Edit tasks in an editor */
     pub fn edit(&mut self, args: &[String]) {
-        let mut tasks_idx: Vec<usize> = Vec::new();
-
         if args.is_empty() {
-            tasks_idx = (0..self.tasks.len()).collect();
+            eprintln!("todo edit needs at least 1 argument");
+            process::exit(1);
         } else {
             for arg in args {
                 let idx = match arg.parse::<usize>() {
@@ -311,13 +304,9 @@ impl Todo {
                 };
 
                 if idx < self.tasks.len() {
-                    tasks_idx.push(idx);
+                    self.edit_task_in_editor(idx);
                 }
             }
-        }
-
-        if !tasks_idx.is_empty() {
-            self.open_tasks_in_editor(&tasks_idx);
         }
     }
 
