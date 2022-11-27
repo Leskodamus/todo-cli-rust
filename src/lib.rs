@@ -13,7 +13,8 @@ pub struct Todo {
 }
 
 impl Todo {
-    /* Create a new todo instance whiche creates the todo file */
+    /* Create a new todo instance which creates the todo file 
+     * TODO: use config file and/or env var for file path */
     pub fn new() -> Result<Self, String> {
         let home = match env::consts::OS {
             "linux" | "macos" => {
@@ -38,7 +39,7 @@ impl Todo {
                 .write(true)
                 .read(true)
                 .create(true)
-                .open(&file_path) 
+                .open(&file_path)
         {
             Ok(f) => f,
             Err(e) => return Err(format!("failed to open todo file: {}", e)),
@@ -46,7 +47,10 @@ impl Todo {
 
         let tasks: Tasks = BufReader::new(todo_file)
             .lines()
-            .map(|task| task.expect("failed to read todo file"))
+            .enumerate()
+            .map(|(idx, task)| task.expect(
+                format!("failed to read todo file while reading line {}", idx+1).as_str()
+            ))
             .collect();
 
         let n_tasks = tasks.len();
