@@ -173,20 +173,24 @@ impl Todo {
             eprintln!("todo rm needs at least 1 argument");
             process::exit(1);
         } else {
-            /* If (not the last) element gets removed, all remaining indices 
-             * have to get reduced by one for each removal */
-            let mut decr_next = 0;
+            let mut indices = Vec::<usize>::new();
             for arg in args {
-                let idx = arg.parse::<usize>().unwrap() - 1 - decr_next;
+                let idx = match arg.parse::<usize>() {
+                    Ok(i) => i-1,
+                    Err(_) => {
+                        eprintln!("todo edit requires a positive integer as argument");
+                        process::exit(1);
+                    },
+                };
                 if idx < self.tasks.len() {
-                    /* Decrease following indices only if the 
-                     * removed index was not the last item */
-                    if idx < self.tasks.len() - 1 {
-                        decr_next += 1;
-                    }
-                    let _ = self.tasks.remove(idx);
+                    indices.push(idx);
                 }
             }
+
+            /* Sort indices descending to avoid conflicts
+             * with indexing when removing tasks */
+            indices.sort_by(|a, b| b.cmp(a));
+            indices.iter().for_each(|idx| { self.tasks.remove(*idx); () });
 
             match self.write_to_file(false) {
                 Ok(_) => (),
