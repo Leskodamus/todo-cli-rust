@@ -1,5 +1,6 @@
-# todo-cli
-A lightweight and super fast cli todo program written in Rust
+# todo-cli-rust
+
+A lightweight and super fast cli todo program written in Rust.
 
 Currently supported operating systems:
 
@@ -9,7 +10,7 @@ Currently supported operating systems:
 
 Fork of <https://github.com/sioodmy/todo>
 
-## usage
+## Usage
 
 ```Usage: todo [COMMAND] [ARGUMENTS]
 todo is a super fast and simple tasks organizer written in rust
