@@ -18,7 +18,7 @@ todo is a super fast and simple tasks organizer written in rust
 Available commands:
     - add [TASK]
         adds new task(s)
-        Example: todo add \"read a book\" \"do homework\"
+        Example: todo add "read a book" "do homework"
     - rm [INDEX] 
         removes task(s) with INDEX 
         Example: todo rm 4 1 (removes first and fourth task)
